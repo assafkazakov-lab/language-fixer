@@ -149,30 +149,6 @@
     try { chrome.storage.local.set({ [PREF_KEY]: lang }); } catch {}
   }
 
-  // ── OS keyboard switch shortcut ───────────────────────────────────────────
-  // Loaded once at startup; refreshed before showing the confirm phase.
-  let kbShortcut = null; // { key, ctrlKey, metaKey, altKey, shiftKey, display }
-
-  function loadKbShortcut(cb) {
-    try {
-      chrome.storage.local.get('keyboard_switch_shortcut', r => {
-        kbShortcut = r.keyboard_switch_shortcut || null;
-        cb && cb(kbShortcut);
-      });
-    } catch { cb && cb(null); }
-  }
-
-  function matchesShortcut(e, sc) {
-    return sc &&
-      e.key       === sc.key &&
-      e.ctrlKey   === sc.ctrlKey &&
-      e.metaKey   === sc.metaKey &&
-      e.altKey    === sc.altKey &&
-      e.shiftKey  === sc.shiftKey;
-  }
-
-  loadKbShortcut();
-
   // ── Shadow-DOM chip ───────────────────────────────────────────────────────
   const host = document.createElement('div');
   host.setAttribute('data-lang-fixer-host', '');
@@ -204,11 +180,6 @@
         overflow: hidden;
       }
       .chip.visible { opacity: 1; transform: translateY(0) scale(1); }
-      .chip.confirmed {
-        border-color: #188038;
-        box-shadow: 0 3px 12px rgba(24,128,56,0.18), 0 1px 4px rgba(0,0,0,0.08);
-      }
-
       /* ── Suggest phase ── */
       #phase-suggest {
         display: flex;
@@ -234,30 +205,6 @@
       .action-label { color: #5f6368; font-weight: 400; }
       .action-target { color: #1a73e8; font-weight: 600; }
 
-      /* ── Confirm phase ── */
-      #phase-confirm {
-        display: none;
-        align-items: center;
-        gap: 8px;
-        padding: 0 8px 0 14px;
-      }
-      #phase-confirm.active { display: flex; }
-      .check { color: #188038; font-size: 15px; font-weight: 700; line-height: 1; }
-      .confirm-text { font-size: 12.5px; color: #3c4043; line-height: 1; }
-      .kbd-pill {
-        display: none;
-        background: #f1f3f4;
-        border: 1px solid #dadce0;
-        border-bottom-width: 2px;
-        border-radius: 4px;
-        padding: 2px 7px;
-        font-size: 11px;
-        font-family: monospace;
-        color: #3c4043;
-        line-height: 1.5;
-      }
-      .kbd-pill.visible { display: inline-block; }
-
       /* ── Shared ── */
       .sep {
         width: 1px;
@@ -265,9 +212,7 @@
         background: #dadce0;
         margin: 5px 0;
         flex-shrink: 0;
-        transition: background 0.2s;
       }
-      .chip.confirmed .sep { background: #ceead6; }
       .dismiss {
         display: flex;
         align-items: center;
@@ -298,33 +243,18 @@
         <button class="dismiss" id="suggest-dismiss" title="Dismiss">✕</button>
       </div>
 
-      <!-- Phase 2: fix confirmed, keyboard switch reminder -->
-      <div id="phase-confirm">
-        <span class="check">✓</span>
-        <span class="confirm-text" id="confirm-text">Converted — switch keyboard to English</span>
-        <kbd class="kbd-pill" id="kbd-pill"></kbd>
-        <div class="sep"></div>
-        <button class="dismiss" id="confirm-dismiss" title="Dismiss">✕</button>
-      </div>
-
     </div>
   `;
 
-  const chip          = shadow.getElementById('chip');
-  const phaseSuggest  = shadow.getElementById('phase-suggest');
-  const phaseConfirm  = shadow.getElementById('phase-confirm');
-  const actionBtn     = shadow.getElementById('action-btn');
-  const actionLabel   = shadow.getElementById('action-label');
-  const actionTarget  = shadow.getElementById('action-target');
+  const chip           = shadow.getElementById('chip');
+  const actionBtn      = shadow.getElementById('action-btn');
+  const actionLabel    = shadow.getElementById('action-label');
+  const actionTarget   = shadow.getElementById('action-target');
   const suggestDismiss = shadow.getElementById('suggest-dismiss');
-  const confirmText   = shadow.getElementById('confirm-text');
-  const kbdPill       = shadow.getElementById('kbd-pill');
-  const confirmDismiss = shadow.getElementById('confirm-dismiss');
 
   let activeField    = null;
   let pendingDir     = null;
   let detectionTimer = null;
-  let confirmTimer   = null;
 
   // ── Positioning ───────────────────────────────────────────────────────────
   const GAP    = 6;
@@ -341,8 +271,8 @@
     host.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
   }
 
-  // ── Chip phase helpers ────────────────────────────────────────────────────
-  function enterSuggestPhase(direction) {
+  // ── Chip helpers ──────────────────────────────────────────────────────────
+  function showChip(el, direction) {
     pendingDir = direction;
     if (direction === 'toEnglish') {
       actionLabel.textContent  = 'Typed in Hebrew?';
@@ -351,57 +281,18 @@
       actionLabel.textContent  = 'Typed in English?';
       actionTarget.textContent = 'Switch to Hebrew';
     }
-    phaseSuggest.style.display = '';
-    phaseConfirm.classList.remove('active');
-    chip.classList.remove('confirmed');
-  }
-
-  function enterConfirmPhase(targetLang) {
-    const langLabel = targetLang === 'en' ? 'English' : 'Hebrew';
-
-    // Reload shortcut in case user just configured it in the popup
-    loadKbShortcut(sc => {
-      confirmText.textContent = `Converted — switch keyboard to ${langLabel}`;
-
-      if (sc) {
-        kbdPill.textContent = sc.display;
-        kbdPill.classList.add('visible');
-      } else {
-        kbdPill.classList.remove('visible');
-      }
-
-      phaseSuggest.style.display = 'none';
-      phaseConfirm.classList.add('active');
-      chip.classList.add('confirmed');
-
-      // Auto-dismiss after 8 s if the user doesn't interact
-      clearTimeout(confirmTimer);
-      confirmTimer = setTimeout(hideChip, 8000);
-    });
-  }
-
-  function showChip(el, direction) {
     placeChip(el);
-    enterSuggestPhase(direction);
     chip.classList.add('visible');
   }
 
   function hideChip() {
-    clearTimeout(confirmTimer);
     chip.classList.remove('visible');
     pendingDir = null;
-    // Reset to suggest phase after the fade-out completes
-    setTimeout(() => {
-      phaseSuggest.style.display = '';
-      phaseConfirm.classList.remove('active');
-      chip.classList.remove('confirmed');
-    }, 160);
   }
 
-  // ── Suggest phase actions ─────────────────────────────────────────────────
-  actionBtn.addEventListener('mousedown',     e => e.preventDefault());
+  // ── Chip actions ──────────────────────────────────────────────────────────
+  actionBtn.addEventListener('mousedown',      e => e.preventDefault());
   suggestDismiss.addEventListener('mousedown', e => e.preventDefault());
-  confirmDismiss.addEventListener('mousedown', e => e.preventDefault());
 
   actionBtn.addEventListener('click', () => {
     if (!activeField || !pendingDir) return;
@@ -409,18 +300,15 @@
     const lang = pendingDir === 'toEnglish' ? 'en' : 'he';
     applyConvert(activeField, fn);
     savePref(lang);
-    enterConfirmPhase(lang);
+    hideChip();
     activeField.focus();
   });
 
   suggestDismiss.addEventListener('click', hideChip);
-  confirmDismiss.addEventListener('click', hideChip);
 
   // ── Detection loop ────────────────────────────────────────────────────────
   function runDetection(el) {
     if (!el || !isEditable(el)) return;
-    // Don't overwrite the confirm phase with a new suggestion
-    if (phaseConfirm.classList.contains('active')) return;
     const target = getSelection(el) || getText(el);
     const dir    = detectConversion(target);
     if (dir) showChip(el, dir);
@@ -463,14 +351,6 @@
 
   // ── Keyboard listeners ────────────────────────────────────────────────────
   document.addEventListener('keydown', e => {
-    // Dismiss confirm phase when the user presses their OS keyboard switch shortcut.
-    // The OS will also switch the keyboard at the same moment — no need to preventDefault.
-    if (phaseConfirm.classList.contains('active') && matchesShortcut(e, kbShortcut)) {
-      hideChip();
-      return;
-    }
-
-    // Alt+Shift+F — apply suggestion if chip is in suggest phase, else detect on demand
     if (e.altKey && e.shiftKey && e.key === 'F' && activeField) {
       e.preventDefault();
       e.stopPropagation();

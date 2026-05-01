@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!-- Open this file in a browser, then click "Download all icons".
+     It generates and saves icon16.png, icon48.png, icon128.png. -->
+<html>
+<head><meta charset="UTF-8"><title>Generate Icons</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  canvas { border: 1px solid #eee; margin: 4px; }
+  button { padding: 10px 20px; font-size: 14px; background: #1a73e8; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+<h2>Language Fixer — Icon Generator</h2>
+<div id="previews"></div>
+<button onclick="downloadAll()">Download all icons</button>
+<script>
+function drawIcon(size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const r = size * 0.12;
+
+  // Background
+  ctx.fillStyle = '#1a73e8';
+  roundRect(ctx, 0, 0, size, size, r);
+  ctx.fill();
+
+  // Text label
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (size >= 48) {
+    // Two characters: Hebrew א and Latin A separated by arrows
+    ctx.font = `bold ${size * 0.28}px -apple-system, Arial, sans-serif`;
+    ctx.fillText('↔', size / 2, size * 0.38);
+    ctx.font = `${size * 0.22}px -apple-system, Arial, sans-serif`;
+    ctx.fillText('א  A', size / 2, size * 0.72);
+  } else {
+    // Small: just the arrows
+    ctx.font = `bold ${size * 0.52}px -apple-system, Arial, sans-serif`;
+    ctx.fillText('↔', size / 2, size / 2);
+  }
+
+  return canvas;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+const sizes = [16, 48, 128];
+const previews = document.getElementById('previews');
+
+sizes.forEach(s => {
+  const c = drawIcon(s);
+  const label = document.createElement('div');
+  label.textContent = `${s}×${s}`;
+  previews.appendChild(label);
+  previews.appendChild(c);
+});
+
+function downloadAll() {
+  sizes.forEach(s => {
+    const c = drawIcon(s);
+    const a = document.createElement('a');
+    a.download = `icon${s}.png`;
+    a.href = c.toDataURL('image/png');
+    a.click();
+  });
+}
+</script>
+</body>
+</html>

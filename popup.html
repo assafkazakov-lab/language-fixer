@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Language Fixer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 13px;
+      color: #3c4043;
+      background: #fff;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid #f1f3f4;
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      background: #1a73e8;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #202124;
+    }
+
+    h1 small {
+      display: block;
+      font-size: 11px;
+      font-weight: 400;
+      color: #5f6368;
+      margin-top: 1px;
+    }
+
+    section { padding: 14px 16px; }
+    section + section { border-top: 1px solid #f1f3f4; }
+
+    h2 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #5f6368;
+      margin-bottom: 10px;
+    }
+
+    .steps { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+    .steps li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      line-height: 1.5;
+    }
+
+    .num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      background: #e8f0fe;
+      color: #1a73e8;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    kbd {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    kbd span {
+      background: #f1f3f4;
+      border: 1px solid #dadce0;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #3c4043;
+    }
+
+    .note {
+      font-size: 11.5px;
+      color: #5f6368;
+      line-height: 1.55;
+      background: #fafafa;
+      border-left: 3px solid #dadce0;
+      padding: 8px 10px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .pref-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .pref-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pref-label { color: #5f6368; font-size: 12px; }
+
+    #pref-value {
+      font-weight: 600;
+      color: #1a73e8;
+    }
+
+    .clear-btn {
+      font-size: 11px;
+      color: #d93025;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 0;
+      text-decoration: underline;
+    }
+
+    .clear-btn:hover { opacity: 0.75; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">↔</div>
+  <h1>
+    Language Fixer
+    <small>Hebrew ↔ English keyboard converter</small>
+  </h1>
+</header>
+
+<section>
+  <h2>How to use</h2>
+  <ol class="steps">
+    <li>
+      <span class="num">1</span>
+      <span>Type in any text field. If wrong-language text is detected, a suggestion chip appears near the field.</span>
+    </li>
+    <li>
+      <span class="num">2</span>
+      <span>Click the chip to convert the text and save a language preference for this site. A reminder will nudge you to switch your keyboard.</span>
+    </li>
+    <li>
+      <span class="num">3</span>
+      <span>Press <kbd><span>⌥</span><span>⇧</span><span>F</span></kbd> to trigger the same action from the keyboard without clicking.</span>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2>Keyboard shortcut</h2>
+  <div class="shortcut-row">
+    <span>Fix language</span>
+    <kbd><span>⌥ Alt</span><span>⇧ Shift</span><span>F</span></kbd>
+  </div>
+</section>
+
+<section>
+  <h2>Site preference</h2>
+  <div class="pref-section">
+    <div class="pref-row">
+      <span class="pref-label">Saved for <span id="hostname">this site</span>:</span>
+      <span id="pref-value">none</span>
+    </div>
+    <button class="clear-btn" id="clear-btn">Clear preference</button>
+  </div>
+</section>
+
+<section>
+  <p class="note">This extension only converts typed text using a keyboard layout map. It does <strong>not</strong> change your OS or system keyboard language.</p>
+</section>
+
+<script src="popup.js"></script>
+</body>
+</html>

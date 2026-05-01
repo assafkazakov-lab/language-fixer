@@ -111,18 +111,23 @@
   }
 
   function setFullText(el, text) {
+    // execCommand fires a proper InputEvent that all frameworks handle naturally,
+    // avoiding the need to manually dispatch 'input' or 'change' events
+    // (manually dispatched 'change' breaks many search bars that treat it as a submit/reset).
+    el.focus();
     if (el.isContentEditable) {
-      el.focus();
       document.execCommand('selectAll', false, null);
-      document.execCommand('insertText', false, text);
-      return;
+    } else {
+      el.select();
     }
-    const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
-    const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-    if (nativeSetter) nativeSetter.call(el, text);
-    else el.value = text;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    if (!document.execCommand('insertText', false, text)) {
+      // execCommand unavailable (e.g. Firefox some contexts) — fallback
+      const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (nativeSetter) nativeSetter.call(el, text);
+      else el.value = text;
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
+    }
   }
 
   function replaceSelection(el, newText) {
@@ -301,7 +306,6 @@
     applyConvert(activeField, fn);
     savePref(lang);
     hideChip();
-    activeField.focus();
   });
 
   suggestDismiss.addEventListener('click', hideChip);

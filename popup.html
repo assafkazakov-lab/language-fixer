@@ -148,38 +148,6 @@
 
     .clear-btn:hover { opacity: 0.75; }
 
-    /* Keyboard switch shortcut capture */
-    .shortcut-capture-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    #switch-shortcut {
-      flex: 1;
-      border: 1px solid #dadce0;
-      border-radius: 6px;
-      padding: 5px 9px;
-      font-size: 13px;
-      font-family: monospace;
-      color: #202124;
-      outline: none;
-      cursor: pointer;
-      transition: border-color 0.1s;
-      background: #fff;
-    }
-    #switch-shortcut:focus {
-      border-color: #1a73e8;
-      box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
-    }
-    #switch-shortcut::placeholder { color: #9aa0a6; font-family: inherit; }
-
-    .shortcut-hint {
-      font-size: 11px;
-      color: #9aa0a6;
-      line-height: 1.4;
-    }
   </style>
 </head>
 <body>
@@ -218,14 +186,6 @@
   </div>
 </section>
 
-<section>
-  <h2>OS keyboard switch shortcut</h2>
-  <div class="shortcut-capture-row">
-    <input type="text" id="switch-shortcut" placeholder="Click here and press your shortcut" readonly />
-    <button class="clear-btn" id="clear-shortcut">Clear</button>
-  </div>
-  <p class="shortcut-hint">After converting text the chip shows this shortcut as a reminder. When you press it, the chip auto-dismisses.</p>
-</section>
 
 <section>
   <h2>Site preference</h2>

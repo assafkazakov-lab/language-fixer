@@ -5,8 +5,6 @@
   window.__langFixerLoaded = true;
 
   // ── Keyboard layout map ──────────────────────────────────────────────────
-  // Standard Israeli QWERTY: which Hebrew character each English key produces
-  // when the OS keyboard is switched to Hebrew.
   const EN_TO_HE = {
     e:'ק', r:'ר', t:'א', y:'ט', u:'ו', i:'ן', o:'ם', p:'פ',
     a:'ש', s:'ד', d:'ג', f:'כ', g:'ע', h:'י', j:'ח', k:'ל', l:'ך',
@@ -25,21 +23,15 @@
     return [...text].map(ch => HE_TO_EN[ch] ?? ch).join('');
   }
 
-  // ── High-confidence auto-detection ──────────────────────────────────────
-  // Common English words: if any appear as isolated tokens the input is almost
-  // certainly real English. Hebrew keyboard typing of common Hebrew words
-  // never produces these as complete tokens.
+  // ── High-confidence detection ────────────────────────────────────────────
   const EN_STOP = new Set([
-    // Articles / conjunctions / prepositions / pronouns
     'the','a','an','and','or','but','nor','so','yet','for','of','in',
     'on','at','to','by','up','as','if','it','he','she','we','they',
     'me','my','his','her','its','our','their','this','that','these',
     'those','who','what','which','where','when','why','how',
-    // Auxiliary / linking verbs
     'be','am','is','are','was','were','been','being','have','has','had',
     'do','does','did','will','would','shall','should','may','might',
     'must','can','could',
-    // Most frequent content words
     'not','with','from','into','about','than','then','now','only','over',
     'also','back','just','more','out','all','well','even','get','him',
     'them','some','other','any','each','both','you','your','say',
@@ -49,7 +41,6 @@
     'move','live','stand','lose','pay','meet','set','learn','change',
     'lead','write','read','spend','grow','open','walk','win','follow',
     'stop','build','send','help','start','add','turn','love',
-    // Common everyday words that would never come from Hebrew keyboard typing
     'hello','hi','hey','okay','ok','yes','no','please','thanks','thank',
     'sorry','sure','right','wrong','good','bad','great','nice','new',
     'old','big','small','long','short','true','false','real','test',
@@ -61,7 +52,7 @@
     'through','between','without','because','though','while','since',
   ]);
 
-  // Returns 'toEnglish' | 'toHebrew' | null (null = not confident enough)
+  // Returns 'toEnglish' | 'toHebrew' | null
   function detectConversion(text) {
     let heCount = 0, enLower = 0, enUpper = 0;
     for (const ch of text) {
@@ -71,31 +62,27 @@
     }
     const enCount = enLower + enUpper;
     const total   = heCount + enCount;
-
     if (total < 3) return null;
 
     const heRatio = heCount / total;
     const enRatio = enCount / total;
 
-    // Mostly Hebrew → check if converted English would have a plausible vowel ratio
     if (heRatio >= 0.85) {
       const converted = toEnglish(text);
       const letters   = converted.replace(/[^a-zA-Z]/g, '');
       const vowels    = (letters.match(/[aeiou]/gi) || []).length;
       const vr        = letters.length ? vowels / letters.length : 0;
-      // Natural prose: ~15–65% vowels. Outside this range → likely real Hebrew.
       return (vr >= 0.15 && vr <= 0.65) ? 'toEnglish' : null;
     }
 
-    // Mostly Latin → check that it's not real English
     if (enRatio >= 0.85) {
-      if (enUpper > 0) return null; // uppercase = intentional English capitalisation
+      if (enUpper > 0) return null;
       const words = text.toLowerCase().match(/[a-z]+/g) || [];
       if (words.some(w => EN_STOP.has(w))) return null;
       return 'toHebrew';
     }
 
-    return null; // mixed scripts — don't guess
+    return null;
   }
 
   // ── Field helpers ────────────────────────────────────────────────────────
@@ -123,7 +110,6 @@
     return (s != null && s !== e) ? el.value.slice(s, e) : '';
   }
 
-  // Sets full field value, compatible with React/Vue controlled inputs
   function setFullText(el, text) {
     if (el.isContentEditable) {
       el.focus();
@@ -163,7 +149,31 @@
     try { chrome.storage.local.set({ [PREF_KEY]: lang }); } catch {}
   }
 
-  // ── Shadow-DOM suggestion chip ───────────────────────────────────────────
+  // ── OS keyboard switch shortcut ───────────────────────────────────────────
+  // Loaded once at startup; refreshed before showing the confirm phase.
+  let kbShortcut = null; // { key, ctrlKey, metaKey, altKey, shiftKey, display }
+
+  function loadKbShortcut(cb) {
+    try {
+      chrome.storage.local.get('keyboard_switch_shortcut', r => {
+        kbShortcut = r.keyboard_switch_shortcut || null;
+        cb && cb(kbShortcut);
+      });
+    } catch { cb && cb(null); }
+  }
+
+  function matchesShortcut(e, sc) {
+    return sc &&
+      e.key       === sc.key &&
+      e.ctrlKey   === sc.ctrlKey &&
+      e.metaKey   === sc.metaKey &&
+      e.altKey    === sc.altKey &&
+      e.shiftKey  === sc.shiftKey;
+  }
+
+  loadKbShortcut();
+
+  // ── Shadow-DOM chip ───────────────────────────────────────────────────────
   const host = document.createElement('div');
   host.setAttribute('data-lang-fixer-host', '');
   Object.assign(host.style, {
@@ -178,8 +188,7 @@
 
       .chip {
         display: inline-flex;
-        align-items: center;
-        gap: 0;
+        align-items: stretch;
         background: #fff;
         border: 1.5px solid #1a73e8;
         border-radius: 24px;
@@ -187,19 +196,24 @@
         pointer-events: all;
         opacity: 0;
         transform: translateY(5px) scale(0.97);
-        transition: opacity 0.15s ease, transform 0.15s ease;
+        transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
         font-size: 13px;
         white-space: nowrap;
         user-select: none;
         overflow: hidden;
       }
-      .chip.visible {
-        opacity: 1;
-        transform: translateY(0) scale(1);
+      .chip.visible { opacity: 1; transform: translateY(0) scale(1); }
+      .chip.confirmed {
+        border-color: #188038;
+        box-shadow: 0 3px 12px rgba(24,128,56,0.18), 0 1px 4px rgba(0,0,0,0.08);
       }
 
-      /* Main action button — takes up most of the chip */
+      /* ── Suggest phase ── */
+      #phase-suggest {
+        display: flex;
+        align-items: center;
+      }
       .action {
         display: flex;
         align-items: center;
@@ -217,86 +231,105 @@
       }
       .action:hover { background: #e8f0fe; }
       .action:active { background: #d2e3fc; }
-
-      .action-icon { font-size: 15px; line-height: 1; }
-
       .action-label { color: #5f6368; font-weight: 400; }
       .action-target { color: #1a73e8; font-weight: 600; }
 
-      /* Separator */
+      /* ── Confirm phase ── */
+      #phase-confirm {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 0 8px 0 14px;
+      }
+      #phase-confirm.active { display: flex; }
+      .check { color: #188038; font-size: 15px; font-weight: 700; line-height: 1; }
+      .confirm-text { font-size: 12.5px; color: #3c4043; line-height: 1; }
+      .kbd-pill {
+        display: none;
+        background: #f1f3f4;
+        border: 1px solid #dadce0;
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        padding: 2px 7px;
+        font-size: 11px;
+        font-family: monospace;
+        color: #3c4043;
+        line-height: 1.5;
+      }
+      .kbd-pill.visible { display: inline-block; }
+
+      /* ── Shared ── */
       .sep {
         width: 1px;
         align-self: stretch;
-        background: #c5d8fd;
+        background: #dadce0;
         margin: 5px 0;
+        flex-shrink: 0;
+        transition: background 0.2s;
       }
-
-      /* Dismiss button */
+      .chip.confirmed .sep { background: #ceead6; }
       .dismiss {
         display: flex;
         align-items: center;
         justify-content: center;
         border: none;
         background: none;
-        padding: 0 10px 0 8px;
+        padding: 0 11px;
         cursor: pointer;
         color: #80868b;
         font-size: 14px;
         line-height: 1;
         transition: color 0.08s;
-        height: 100%;
+        align-self: stretch;
       }
       .dismiss:hover { color: #3c4043; }
-
-      /* After-fix toast */
-      .toast {
-        position: absolute;
-        top: calc(100% + 6px);
-        left: 0;
-        background: #3c4043;
-        color: #fff;
-        font-size: 11.5px;
-        padding: 5px 11px;
-        border-radius: 8px;
-        white-space: nowrap;
-        pointer-events: none;
-        opacity: 0;
-        transform: translateY(-3px);
-        transition: opacity 0.15s, transform 0.15s;
-      }
-      .toast.show { opacity: 1; transform: translateY(0); }
     </style>
 
     <div class="chip" id="chip">
-      <button class="action" id="action-btn">
-        <span class="action-icon" id="action-icon">⌨️</span>
-        <span class="action-label" id="action-label">Typed in Hebrew?</span>
-        &nbsp;→&nbsp;
-        <span class="action-target" id="action-target">Switch to English</span>
-      </button>
-      <div class="sep"></div>
-      <button class="dismiss" id="dismiss-btn" title="Dismiss">✕</button>
-      <div class="toast" id="toast"></div>
+
+      <!-- Phase 1: wrong-language suggestion -->
+      <div id="phase-suggest">
+        <button class="action" id="action-btn">
+          <span class="action-label" id="action-label">Typed in Hebrew?</span>
+          &thinsp;→&thinsp;
+          <span class="action-target" id="action-target">Switch to English</span>
+        </button>
+        <div class="sep"></div>
+        <button class="dismiss" id="suggest-dismiss" title="Dismiss">✕</button>
+      </div>
+
+      <!-- Phase 2: fix confirmed, keyboard switch reminder -->
+      <div id="phase-confirm">
+        <span class="check">✓</span>
+        <span class="confirm-text" id="confirm-text">Converted — switch keyboard to English</span>
+        <kbd class="kbd-pill" id="kbd-pill"></kbd>
+        <div class="sep"></div>
+        <button class="dismiss" id="confirm-dismiss" title="Dismiss">✕</button>
+      </div>
+
     </div>
   `;
 
-  const chip       = shadow.getElementById('chip');
-  const actionBtn  = shadow.getElementById('action-btn');
-  const actionIcon = shadow.getElementById('action-icon');
-  const actionLbl  = shadow.getElementById('action-label');
-  const actionTgt  = shadow.getElementById('action-target');
-  const dismissBtn = shadow.getElementById('dismiss-btn');
-  const toast      = shadow.getElementById('toast');
+  const chip          = shadow.getElementById('chip');
+  const phaseSuggest  = shadow.getElementById('phase-suggest');
+  const phaseConfirm  = shadow.getElementById('phase-confirm');
+  const actionBtn     = shadow.getElementById('action-btn');
+  const actionLabel   = shadow.getElementById('action-label');
+  const actionTarget  = shadow.getElementById('action-target');
+  const suggestDismiss = shadow.getElementById('suggest-dismiss');
+  const confirmText   = shadow.getElementById('confirm-text');
+  const kbdPill       = shadow.getElementById('kbd-pill');
+  const confirmDismiss = shadow.getElementById('confirm-dismiss');
 
   let activeField    = null;
-  let pendingDir     = null; // 'toEnglish' | 'toHebrew'
+  let pendingDir     = null;
   let detectionTimer = null;
-  let toastTimer     = null;
+  let confirmTimer   = null;
 
-  // ── Chip positioning ──────────────────────────────────────────────────────
+  // ── Positioning ───────────────────────────────────────────────────────────
   const GAP    = 6;
   const CHIP_H = 36;
-  const CHIP_W = 280;
+  const CHIP_W = 320;
 
   function placeChip(el) {
     const r    = el.getBoundingClientRect();
@@ -308,36 +341,86 @@
     host.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
   }
 
-  function showChip(el, direction) {
+  // ── Chip phase helpers ────────────────────────────────────────────────────
+  function enterSuggestPhase(direction) {
     pendingDir = direction;
-    placeChip(el);
     if (direction === 'toEnglish') {
-      actionIcon.textContent = '🔤';
-      actionLbl.textContent  = 'Typed in Hebrew?';
-      actionTgt.textContent  = 'Switch to English';
+      actionLabel.textContent  = 'Typed in Hebrew?';
+      actionTarget.textContent = 'Switch to English';
     } else {
-      actionIcon.textContent = '🔤';
-      actionLbl.textContent  = 'Typed in English?';
-      actionTgt.textContent  = 'Switch to Hebrew';
+      actionLabel.textContent  = 'Typed in English?';
+      actionTarget.textContent = 'Switch to Hebrew';
     }
+    phaseSuggest.style.display = '';
+    phaseConfirm.classList.remove('active');
+    chip.classList.remove('confirmed');
+  }
+
+  function enterConfirmPhase(targetLang) {
+    const langLabel = targetLang === 'en' ? 'English' : 'Hebrew';
+
+    // Reload shortcut in case user just configured it in the popup
+    loadKbShortcut(sc => {
+      confirmText.textContent = `Converted — switch keyboard to ${langLabel}`;
+
+      if (sc) {
+        kbdPill.textContent = sc.display;
+        kbdPill.classList.add('visible');
+      } else {
+        kbdPill.classList.remove('visible');
+      }
+
+      phaseSuggest.style.display = 'none';
+      phaseConfirm.classList.add('active');
+      chip.classList.add('confirmed');
+
+      // Auto-dismiss after 8 s if the user doesn't interact
+      clearTimeout(confirmTimer);
+      confirmTimer = setTimeout(hideChip, 8000);
+    });
+  }
+
+  function showChip(el, direction) {
+    placeChip(el);
+    enterSuggestPhase(direction);
     chip.classList.add('visible');
   }
 
   function hideChip() {
+    clearTimeout(confirmTimer);
     chip.classList.remove('visible');
     pendingDir = null;
+    // Reset to suggest phase after the fade-out completes
+    setTimeout(() => {
+      phaseSuggest.style.display = '';
+      phaseConfirm.classList.remove('active');
+      chip.classList.remove('confirmed');
+    }, 160);
   }
 
-  function showToast(msg) {
-    clearTimeout(toastTimer);
-    toast.textContent = msg;
-    toast.classList.add('show');
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
-  }
+  // ── Suggest phase actions ─────────────────────────────────────────────────
+  actionBtn.addEventListener('mousedown',     e => e.preventDefault());
+  suggestDismiss.addEventListener('mousedown', e => e.preventDefault());
+  confirmDismiss.addEventListener('mousedown', e => e.preventDefault());
+
+  actionBtn.addEventListener('click', () => {
+    if (!activeField || !pendingDir) return;
+    const fn   = pendingDir === 'toEnglish' ? toEnglish : toHebrew;
+    const lang = pendingDir === 'toEnglish' ? 'en' : 'he';
+    applyConvert(activeField, fn);
+    savePref(lang);
+    enterConfirmPhase(lang);
+    activeField.focus();
+  });
+
+  suggestDismiss.addEventListener('click', hideChip);
+  confirmDismiss.addEventListener('click', hideChip);
 
   // ── Detection loop ────────────────────────────────────────────────────────
   function runDetection(el) {
     if (!el || !isEditable(el)) return;
+    // Don't overwrite the confirm phase with a new suggestion
+    if (phaseConfirm.classList.contains('active')) return;
     const target = getSelection(el) || getText(el);
     const dir    = detectConversion(target);
     if (dir) showChip(el, dir);
@@ -346,28 +429,8 @@
 
   function scheduleDetection(el) {
     clearTimeout(detectionTimer);
-    // Small delay so we don't fire mid-word while the user is still typing
     detectionTimer = setTimeout(() => runDetection(el), 700);
   }
-
-  // ── Chip actions ──────────────────────────────────────────────────────────
-  actionBtn.addEventListener('mousedown', e => e.preventDefault()); // keep field focus
-  dismissBtn.addEventListener('mousedown', e => e.preventDefault());
-
-  actionBtn.addEventListener('click', () => {
-    if (!activeField || !pendingDir) return;
-    const fn     = pendingDir === 'toEnglish' ? toEnglish : toHebrew;
-    const lang   = pendingDir === 'toEnglish' ? 'en' : 'he';
-    const label  = pendingDir === 'toEnglish' ? 'English' : 'Hebrew';
-    applyConvert(activeField, fn);
-    savePref(lang);
-    hideChip();
-    // Brief reminder — extension can't switch OS keyboard, so nudge the user
-    showToast(`Text converted. Switch your keyboard to ${label} to continue.`);
-    activeField.focus();
-  });
-
-  dismissBtn.addEventListener('click', () => hideChip());
 
   // ── Field & input tracking ────────────────────────────────────────────────
   document.addEventListener('focusin', e => {
@@ -379,7 +442,6 @@
   document.addEventListener('focusout', e => {
     if (e.target === activeField) {
       clearTimeout(detectionTimer);
-      // Small delay to allow chip button click to fire before hiding
       setTimeout(() => {
         if (document.activeElement !== activeField) {
           hideChip();
@@ -390,35 +452,36 @@
   }, true);
 
   document.addEventListener('input', e => {
-    if (isEditable(e.target) && !e.target.hasAttribute('data-lang-fixer-host')) {
-      activeField = e.target;
-      scheduleDetection(e.target);
-    }
+    if (!isEditable(e.target) || e.target.hasAttribute('data-lang-fixer-host')) return;
+    activeField = e.target;
+    scheduleDetection(e.target);
   }, true);
 
   document.addEventListener('scroll', () => {
     if (activeField && chip.classList.contains('visible')) placeChip(activeField);
   }, { passive: true, capture: true });
 
-  // ── Keyboard shortcut: Alt+Shift+F ───────────────────────────────────────
-  // If the chip is visible, execute its suggestion. Otherwise run detection
-  // on demand and apply if confident.
+  // ── Keyboard listeners ────────────────────────────────────────────────────
   document.addEventListener('keydown', e => {
-    if (!e.altKey || !e.shiftKey || e.key !== 'F' || !activeField) return;
-    e.preventDefault();
-    e.stopPropagation();
+    // Dismiss confirm phase when the user presses their OS keyboard switch shortcut.
+    // The OS will also switch the keyboard at the same moment — no need to preventDefault.
+    if (phaseConfirm.classList.contains('active') && matchesShortcut(e, kbShortcut)) {
+      hideChip();
+      return;
+    }
 
-    const dir = pendingDir ?? detectConversion(getSelection(activeField) || getText(activeField));
-    if (!dir) return;
-    const fn    = dir === 'toEnglish' ? toEnglish : toHebrew;
-    const lang  = dir === 'toEnglish' ? 'en' : 'he';
-    const label = dir === 'toEnglish' ? 'English' : 'Hebrew';
-    applyConvert(activeField, fn);
-    savePref(lang);
-    hideChip();
-    showToast(`Text converted. Switch your keyboard to ${label} to continue.`);
+    // Alt+Shift+F — apply suggestion if chip is in suggest phase, else detect on demand
+    if (e.altKey && e.shiftKey && e.key === 'F' && activeField) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (pendingDir) {
+        actionBtn.click();
+      } else {
+        const dir = detectConversion(getSelection(activeField) || getText(activeField));
+        if (dir) { showChip(activeField, dir); }
+      }
+    }
   }, true);
 
-  // Attach host once
   (document.body ?? document.documentElement).appendChild(host);
 })();

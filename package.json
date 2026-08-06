@@ -1,0 +1,9 @@
+{
+  "name": "language-fixer",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Chrome extension that fixes text typed with the wrong keyboard layout (Hebrew <-> English).",
+  "scripts": {
+    "test": "node test/detect.test.js"
+  }
+}

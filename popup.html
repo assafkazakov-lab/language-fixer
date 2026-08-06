@@ -32,14 +32,11 @@
       align-items: center;
       justify-content: center;
       font-size: 18px;
+      color: #fff;
       flex-shrink: 0;
     }
 
-    h1 {
-      font-size: 15px;
-      font-weight: 600;
-      color: #202124;
-    }
+    h1 { font-size: 15px; font-weight: 600; color: #202124; }
 
     h1 small {
       display: block;
@@ -63,12 +60,7 @@
 
     .steps { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 
-    .steps li {
-      display: flex;
-      gap: 10px;
-      align-items: flex-start;
-      line-height: 1.5;
-    }
+    .steps li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
 
     .num {
       display: flex;
@@ -84,17 +76,10 @@
       margin-top: 1px;
     }
 
-    .shortcut-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .row + .row { margin-top: 10px; }
 
-    kbd {
-      display: inline-flex;
-      gap: 3px;
-      align-items: center;
-    }
+    kbd { display: inline-flex; gap: 3px; align-items: center; flex-shrink: 0; }
 
     kbd span {
       background: #f1f3f4;
@@ -107,6 +92,55 @@
       color: #3c4043;
     }
 
+    .link {
+      font-size: 11px;
+      color: #1a73e8;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    .link:hover { opacity: 0.75; }
+
+    .hostname {
+      font-weight: 600;
+      color: #202124;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Toggle */
+    .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #dadce0;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 2px;
+      top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.15s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+
+    input:checked + .slider { background: #1a73e8; }
+    input:checked + .slider::before { transform: translateX(16px); }
+
     .note {
       font-size: 11.5px;
       color: #5f6368;
@@ -116,38 +150,6 @@
       padding: 8px 10px;
       border-radius: 0 6px 6px 0;
     }
-
-    .pref-section {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .pref-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .pref-label { color: #5f6368; font-size: 12px; }
-
-    #pref-value {
-      font-weight: 600;
-      color: #1a73e8;
-    }
-
-    .clear-btn {
-      font-size: 11px;
-      color: #d93025;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 2px 0;
-      text-decoration: underline;
-    }
-
-    .clear-btn:hover { opacity: 0.75; }
-
   </style>
 </head>
 <body>
@@ -165,41 +167,43 @@
   <ol class="steps">
     <li>
       <span class="num">1</span>
-      <span>Type in any text field. If wrong-language text is detected, a suggestion chip appears near the field.</span>
+      <span>Type normally. If text looks like it was typed on the wrong layout, a suggestion appears under the field.</span>
     </li>
     <li>
       <span class="num">2</span>
-      <span>Click the chip to convert the text and save a language preference for this site. A reminder will nudge you to switch your keyboard.</span>
+      <span>Click it to convert just the affected words. Press <strong>Esc</strong> to dismiss.</span>
     </li>
     <li>
       <span class="num">3</span>
-      <span>Press <kbd><span>⌥</span><span>⇧</span><span>F</span></kbd> to trigger the same action from the keyboard without clicking.</span>
+      <span>Or press the shortcut to flip the selection — or the word at the cursor — whenever you want, including in password fields.</span>
     </li>
   </ol>
 </section>
 
 <section>
   <h2>Keyboard shortcut</h2>
-  <div class="shortcut-row">
-    <span>Fix language</span>
+  <div class="row">
+    <span>Flip language</span>
     <kbd><span>⌥ Alt</span><span>⇧ Shift</span><span>F</span></kbd>
   </div>
-</section>
-
-
-<section>
-  <h2>Site preference</h2>
-  <div class="pref-section">
-    <div class="pref-row">
-      <span class="pref-label">Saved for <span id="hostname">this site</span>:</span>
-      <span id="pref-value">none</span>
-    </div>
-    <button class="clear-btn" id="clear-btn">Clear preference</button>
+  <div class="row">
+    <button class="link" id="rebind">Change shortcut</button>
   </div>
 </section>
 
 <section>
-  <p class="note">This extension only converts typed text using a keyboard layout map. It does <strong>not</strong> change your OS or system keyboard language.</p>
+  <h2>This site</h2>
+  <div class="row">
+    <span class="hostname" id="hostname">…</span>
+    <label class="toggle">
+      <input type="checkbox" id="enabled" checked />
+      <span class="slider"></span>
+    </label>
+  </div>
+</section>
+
+<section>
+  <p class="note">Suggestions are worked out on your device using a built-in language model. Nothing you type is sent anywhere, and your OS keyboard layout is never changed.</p>
 </section>
 
 <script src="popup.js"></script>

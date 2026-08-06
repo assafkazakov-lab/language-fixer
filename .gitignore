@@ -1,0 +1,4 @@
+# Source corpora for tools/build_model.js — fetched on demand, not checked in.
+# Only the derived model (ngrams.js) ships.
+tools/*.txt
+node_modules/

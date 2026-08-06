@@ -4,290 +4,220 @@
   if (window.__langFixerLoaded) return;
   window.__langFixerLoaded = true;
 
-  // ── Keyboard layout map ──────────────────────────────────────────────────
-  const EN_TO_HE = {
-    e:'ק', r:'ר', t:'א', y:'ט', u:'ו', i:'ן', o:'ם', p:'פ',
-    a:'ש', s:'ד', d:'ג', f:'כ', g:'ע', h:'י', j:'ח', k:'ל', l:'ך',
-    z:'ז', x:'ס', c:'ב', v:'ה', b:'נ', n:'מ', m:'צ',
-    ';':'ף', ',':'ת', '.':'ץ',
-  };
+  var D = window.__langFixerDetect;
+  if (!D) return;
 
-  const HE_TO_EN = Object.fromEntries(Object.entries(EN_TO_HE).map(([e, h]) => [h, e]));
+  var DEBOUNCE_MS = 800;   // long enough that the chip never appears mid-thought
 
-  // ── Conversion functions ─────────────────────────────────────────────────
-  function toHebrew(text) {
-    return [...text].map(ch => EN_TO_HE[ch.toLowerCase()] ?? ch).join('');
-  }
+  // ── Site enable/disable ──────────────────────────────────────────────────
+  var siteEnabled = true;
+  var DISABLED_KEY = 'lang_fixer_disabled_' + location.hostname;
 
-  function toEnglish(text) {
-    return [...text].map(ch => HE_TO_EN[ch] ?? ch).join('');
-  }
-
-  // ── High-confidence detection ────────────────────────────────────────────
-  const EN_STOP = new Set([
-    'the','a','an','and','or','but','nor','so','yet','for','of','in',
-    'on','at','to','by','up','as','if','it','he','she','we','they',
-    'me','my','his','her','its','our','their','this','that','these',
-    'those','who','what','which','where','when','why','how',
-    'be','am','is','are','was','were','been','being','have','has','had',
-    'do','does','did','will','would','shall','should','may','might',
-    'must','can','could',
-    'not','with','from','into','about','than','then','now','only','over',
-    'also','back','just','more','out','all','well','even','get','him',
-    'them','some','other','any','each','both','you','your','say',
-    'said','go','come','take','make','see','know','think','look','want',
-    'give','use','find','tell','ask','work','seem','feel','try','leave',
-    'call','keep','let','put','need','become','show','hear','play','run',
-    'move','live','stand','lose','pay','meet','set','learn','change',
-    'lead','write','read','spend','grow','open','walk','win','follow',
-    'stop','build','send','help','start','add','turn','love',
-    'hello','hi','hey','okay','ok','yes','no','please','thanks','thank',
-    'sorry','sure','right','wrong','good','bad','great','nice','new',
-    'old','big','small','long','short','true','false','real','test',
-    'name','word','line','point','number','place','time','day','week',
-    'year','life','man','woman','people','world','way','thing','part',
-    'case','side','hand','end','home','water','room','door','car','food',
-    'here','there','very','still','never','always','often',
-    'already','every','much','many','few','own','next','after','before',
-    'through','between','without','because','though','while','since',
-  ]);
-
-  // Returns 'toEnglish' | 'toHebrew' | null
-  function detectConversion(text) {
-    let heCount = 0, enLower = 0, enUpper = 0;
-    for (const ch of text) {
-      if (/[א-׿]/.test(ch)) heCount++;
-      else if (/[a-z]/.test(ch)) enLower++;
-      else if (/[A-Z]/.test(ch)) enUpper++;
-    }
-    const enCount = enLower + enUpper;
-    const total   = heCount + enCount;
-    if (total < 3) return null;
-
-    const heRatio = heCount / total;
-    const enRatio = enCount / total;
-
-    if (heRatio >= 0.85) {
-      const converted = toEnglish(text);
-      const letters   = converted.replace(/[^a-zA-Z]/g, '');
-      const vowels    = (letters.match(/[aeiou]/gi) || []).length;
-      const vr        = letters.length ? vowels / letters.length : 0;
-      return (vr >= 0.15 && vr <= 0.65) ? 'toEnglish' : null;
-    }
-
-    if (enRatio >= 0.85) {
-      if (enUpper > 0) return null;
-      const words = text.toLowerCase().match(/[a-z]+/g) || [];
-      if (words.some(w => EN_STOP.has(w))) return null;
-      return 'toHebrew';
-    }
-
-    return null;
-  }
+  try {
+    chrome.storage.local.get(DISABLED_KEY, function (r) {
+      siteEnabled = !r[DISABLED_KEY];
+      if (!siteEnabled) hideChip();
+    });
+    chrome.storage.onChanged.addListener(function (changes) {
+      if (changes[DISABLED_KEY]) {
+        siteEnabled = !changes[DISABLED_KEY].newValue;
+        if (!siteEnabled) hideChip();
+      }
+    });
+  } catch (e) { /* storage unavailable; stay enabled */ }
 
   // ── Field helpers ────────────────────────────────────────────────────────
+  var NON_TEXT = ['button','submit','reset','checkbox','radio','file','image','range','color','hidden'];
+
+  function isPassword(el) {
+    return el && el.tagName === 'INPUT' && (el.type || '').toLowerCase() === 'password';
+  }
+
   function isEditable(el) {
     if (!el) return false;
     if (el.isContentEditable) return true;
     if (el.tagName === 'TEXTAREA') return true;
-    if (el.tagName === 'INPUT') {
-      const t = (el.type || '').toLowerCase();
-      return !['button','submit','reset','checkbox','radio','file','image','range','color','hidden'].includes(t);
-    }
+    if (el.tagName === 'INPUT') return NON_TEXT.indexOf((el.type || '').toLowerCase()) === -1;
     return false;
   }
 
   function getText(el) {
-    return el.isContentEditable ? (el.innerText ?? '') : (el.value ?? '');
+    return el.isContentEditable ? (el.innerText || '') : (el.value || '');
   }
 
-  function getSelection(el) {
+  function getSelectionText(el) {
     if (el.isContentEditable) {
-      const sel = window.getSelection();
-      return sel?.toString() || '';
+      var sel = window.getSelection();
+      return sel ? sel.toString() : '';
     }
-    const { selectionStart: s, selectionEnd: e } = el;
+    var s = el.selectionStart, e = el.selectionEnd;
     return (s != null && s !== e) ? el.value.slice(s, e) : '';
   }
 
-  function setFullText(el, text) {
-    // execCommand fires a proper InputEvent that all frameworks handle naturally,
-    // avoiding the need to manually dispatch 'input' or 'change' events
-    // (manually dispatched 'change' breaks many search bars that treat it as a submit/reset).
+  // ── Writing back ─────────────────────────────────────────────────────────
+  // For inputs and textareas we can replace the value wholesale and restore the
+  // caret, since the layout map preserves length exactly.
+  function writeInput(el, next) {
+    var s = el.selectionStart, e = el.selectionEnd;
     el.focus();
-    if (el.isContentEditable) {
-      document.execCommand('selectAll', false, null);
-    } else {
-      el.select();
-    }
-    if (!document.execCommand('insertText', false, text)) {
-      // execCommand unavailable (e.g. Firefox some contexts) — fallback
-      const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
-      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-      if (nativeSetter) nativeSetter.call(el, text);
-      else el.value = text;
+    el.select();
+    if (!document.execCommand('insertText', false, next)) {
+      var proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+      var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+      setter.call(el, next);
       el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
     }
+    if (s != null) try { el.setSelectionRange(s, e); } catch (err) { /* detached */ }
   }
 
-  function replaceSelection(el, newText) {
+  // For contentEditable we rewrite each text node's changed sub-range in place,
+  // so surrounding formatting survives. Selecting the whole editor and
+  // reinserting would flatten it.
+  function writeEditable(el, transform) {
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    var nodes = [], n;
+    while ((n = walker.nextNode())) nodes.push(n);
+
+    var sel = window.getSelection();
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i], text = node.data, next = transform(text);
+      if (next === text) continue;
+
+      var a = 0;
+      while (a < text.length && text[a] === next[a]) a++;
+      var b = text.length;
+      while (b > a && text[b - 1] === next[b - 1]) b--;
+
+      var range = document.createRange();
+      range.setStart(node, a);
+      range.setEnd(node, b);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('insertText', false, next.slice(a, b));
+    }
+  }
+
+  function applyToField(el, transform) {
+    if (el.isContentEditable) { writeEditable(el, transform); return; }
+    var value = el.value;
+    var s = el.selectionStart, e = el.selectionEnd;
+    if (s != null && s !== e) {
+      writeInput(el, value.slice(0, s) + transform(value.slice(s, e)) + value.slice(e));
+    } else {
+      writeInput(el, transform(value));
+    }
+  }
+
+  // ── Hotkey: unconditional flip ───────────────────────────────────────────
+  // No plausibility check — the user asked for it, and flipping is its own
+  // inverse. With no selection we flip the word at the caret, which for a
+  // password field (no spaces) is the whole value.
+  var WORD_CHAR = /[א-תA-Za-z0-9_'/;,.@\\-]/;
+
+  function flipAtCaret(el) {
     if (el.isContentEditable) {
-      el.focus();
-      document.execCommand('insertText', false, newText);
+      var sel = window.getSelection();
+      if (sel && sel.toString()) { writeEditable(el, D.flip); return; }
+      writeEditable(el, D.flip);
       return;
     }
-    const { selectionStart: s, selectionEnd: e, value } = el;
-    setFullText(el, value.slice(0, s) + newText + value.slice(e));
-    el.setSelectionRange(s, s + newText.length);
+    var value = el.value;
+    if (!value) return;
+    var s = el.selectionStart, e = el.selectionEnd;
+    if (s != null && s !== e) {
+      writeInput(el, value.slice(0, s) + D.flip(value.slice(s, e)) + value.slice(e));
+      return;
+    }
+    var caret = s == null ? value.length : s;
+    var start = caret, end = caret;
+    while (start > 0 && WORD_CHAR.test(value[start - 1])) start--;
+    while (end < value.length && WORD_CHAR.test(value[end])) end++;
+    if (start === end) return;
+    writeInput(el, value.slice(0, start) + D.flip(value.slice(start, end)) + value.slice(end));
   }
 
-  function applyConvert(el, fn) {
-    const sel = getSelection(el);
-    if (sel) replaceSelection(el, fn(sel));
-    else { const t = getText(el); if (t) setFullText(el, fn(t)); }
+  function targetField() {
+    var el = document.activeElement;
+    return isEditable(el) ? el : (activeField && document.contains(activeField) ? activeField : null);
   }
 
-  // ── Per-site language preference ─────────────────────────────────────────
-  const PREF_KEY = `lang_pref_${location.hostname}`;
+  try {
+    chrome.runtime.onMessage.addListener(function (msg) {
+      if (msg && msg.type === 'lang-fixer-flip') {
+        var el = targetField();
+        if (el) { flipAtCaret(el); hideChip(); }
+      }
+    });
+  } catch (e) { /* no runtime in this context */ }
 
-  function savePref(lang) {
-    try { chrome.storage.local.set({ [PREF_KEY]: lang }); } catch {}
-  }
-
-  // ── Shadow-DOM chip ───────────────────────────────────────────────────────
-  const host = document.createElement('div');
+  // ── Chip ─────────────────────────────────────────────────────────────────
+  var host = document.createElement('div');
   host.setAttribute('data-lang-fixer-host', '');
-  Object.assign(host.style, {
-    position: 'fixed', top: '0', left: '0',
-    zIndex: '2147483647', pointerEvents: 'none',
-  });
+  host.style.cssText = 'position:fixed;top:0;left:0;z-index:2147483647;pointer-events:none;';
 
-  const shadow = host.attachShadow({ mode: 'open' });
-  shadow.innerHTML = `
-    <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  var shadow = host.attachShadow({ mode: 'open' });
+  shadow.innerHTML = [
+    '<style>',
+    '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}',
+    '.chip{display:inline-flex;align-items:stretch;background:#fff;border:1.5px solid #1a73e8;',
+    'border-radius:24px;box-shadow:0 3px 12px rgba(26,115,232,.18),0 1px 4px rgba(0,0,0,.10);',
+    'pointer-events:all;opacity:0;transform:translateY(5px) scale(.97);visibility:hidden;',
+    'transition:opacity .15s ease,transform .15s ease,visibility .15s;',
+    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;",
+    'font-size:13px;white-space:nowrap;user-select:none;overflow:hidden}',
+    '.chip.visible{opacity:1;transform:translateY(0) scale(1);visibility:visible}',
+    '.row{display:flex;align-items:center}',
+    '.action{display:flex;align-items:center;gap:6px;border:none;background:none;',
+    'padding:6px 4px 6px 14px;cursor:pointer;font-size:13px;font-family:inherit;color:#1a73e8;',
+    'font-weight:500;line-height:1;transition:background .08s}',
+    '.action:hover{background:#e8f0fe}.action:active{background:#d2e3fc}',
+    '.label{color:#5f6368;font-weight:400}.target{color:#1a73e8;font-weight:600}',
+    '.sep{width:1px;align-self:stretch;background:#dadce0;margin:5px 0;flex-shrink:0}',
+    '.dismiss{display:flex;align-items:center;justify-content:center;border:none;background:none;',
+    'padding:0 11px;cursor:pointer;color:#80868b;font-size:14px;line-height:1;',
+    'transition:color .08s;align-self:stretch}',
+    '.dismiss:hover{color:#3c4043}',
+    '</style>',
+    '<div class="chip" id="chip"><div class="row">',
+    '<button class="action" id="action"><span class="label" id="label"></span>',
+    '&thinsp;→&thinsp;<span class="target" id="target"></span></button>',
+    '<div class="sep"></div>',
+    '<button class="dismiss" id="dismiss" title="Dismiss (Esc)">✕</button>',
+    '</div></div>',
+  ].join('');
 
-      .chip {
-        display: inline-flex;
-        align-items: stretch;
-        background: #fff;
-        border: 1.5px solid #1a73e8;
-        border-radius: 24px;
-        box-shadow: 0 3px 12px rgba(26,115,232,0.18), 0 1px 4px rgba(0,0,0,0.10);
-        pointer-events: all;
-        opacity: 0;
-        transform: translateY(5px) scale(0.97);
-        transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-        font-size: 13px;
-        white-space: nowrap;
-        user-select: none;
-        overflow: hidden;
-      }
-      .chip.visible { opacity: 1; transform: translateY(0) scale(1); }
-      /* ── Suggest phase ── */
-      #phase-suggest {
-        display: flex;
-        align-items: center;
-      }
-      .action {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        border: none;
-        background: none;
-        padding: 6px 4px 6px 14px;
-        cursor: pointer;
-        font-size: 13px;
-        font-family: inherit;
-        color: #1a73e8;
-        font-weight: 500;
-        line-height: 1;
-        transition: background 0.08s;
-      }
-      .action:hover { background: #e8f0fe; }
-      .action:active { background: #d2e3fc; }
-      .action-label { color: #5f6368; font-weight: 400; }
-      .action-target { color: #1a73e8; font-weight: 600; }
+  var chip = shadow.getElementById('chip');
+  var actionBtn = shadow.getElementById('action');
+  var labelEl = shadow.getElementById('label');
+  var targetEl = shadow.getElementById('target');
+  var dismissBtn = shadow.getElementById('dismiss');
 
-      /* ── Shared ── */
-      .sep {
-        width: 1px;
-        align-self: stretch;
-        background: #dadce0;
-        margin: 5px 0;
-        flex-shrink: 0;
-      }
-      .dismiss {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: none;
-        background: none;
-        padding: 0 11px;
-        cursor: pointer;
-        color: #80868b;
-        font-size: 14px;
-        line-height: 1;
-        transition: color 0.08s;
-        align-self: stretch;
-      }
-      .dismiss:hover { color: #3c4043; }
-    </style>
+  var activeField = null;
+  var pendingDir = null;
+  var timer = null;
+  // Text the user explicitly dismissed, and text we just produced — both keep
+  // the chip from immediately coming back.
+  var dismissedFor = new WeakMap();
+  var convertedTo = new WeakMap();
 
-    <div class="chip" id="chip">
-
-      <!-- Phase 1: wrong-language suggestion -->
-      <div id="phase-suggest">
-        <button class="action" id="action-btn">
-          <span class="action-label" id="action-label">Typed in Hebrew?</span>
-          &thinsp;→&thinsp;
-          <span class="action-target" id="action-target">Switch to English</span>
-        </button>
-        <div class="sep"></div>
-        <button class="dismiss" id="suggest-dismiss" title="Dismiss">✕</button>
-      </div>
-
-    </div>
-  `;
-
-  const chip           = shadow.getElementById('chip');
-  const actionBtn      = shadow.getElementById('action-btn');
-  const actionLabel    = shadow.getElementById('action-label');
-  const actionTarget   = shadow.getElementById('action-target');
-  const suggestDismiss = shadow.getElementById('suggest-dismiss');
-
-  let activeField    = null;
-  let pendingDir     = null;
-  let detectionTimer = null;
-
-  // ── Positioning ───────────────────────────────────────────────────────────
-  const GAP    = 6;
-  const CHIP_H = 36;
-  const CHIP_W = 320;
+  var GAP = 6, CHIP_H = 36;
 
   function placeChip(el) {
-    const r    = el.getBoundingClientRect();
-    let top  = r.bottom + GAP;
-    let left = r.left;
+    var r = el.getBoundingClientRect();
+    var w = chip.offsetWidth || 320;
+    var top = r.bottom + GAP;
     if (top + CHIP_H > window.innerHeight - 8) top = r.top - CHIP_H - GAP;
-    top  = Math.max(8, top);
-    left = Math.max(8, Math.min(left, window.innerWidth - CHIP_W - 8));
-    host.style.transform = `translate(${Math.round(left)}px,${Math.round(top)}px)`;
+    top = Math.max(8, top);
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    host.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
   }
 
-  // ── Chip helpers ──────────────────────────────────────────────────────────
-  function showChip(el, direction) {
-    pendingDir = direction;
-    if (direction === 'toEnglish') {
-      actionLabel.textContent  = 'Typed in Hebrew?';
-      actionTarget.textContent = 'Switch to English';
-    } else {
-      actionLabel.textContent  = 'Typed in English?';
-      actionTarget.textContent = 'Switch to Hebrew';
-    }
-    placeChip(el);
+  function showChip(el, dir) {
+    pendingDir = dir;
+    labelEl.textContent = dir === 'toEnglish' ? 'Typed in Hebrew?' : 'Typed in English?';
+    targetEl.textContent = dir === 'toEnglish' ? 'Switch to English' : 'Switch to Hebrew';
     chip.classList.add('visible');
+    placeChip(el);
   }
 
   function hideChip() {
@@ -295,77 +225,73 @@
     pendingDir = null;
   }
 
-  // ── Chip actions ──────────────────────────────────────────────────────────
-  actionBtn.addEventListener('mousedown',      e => e.preventDefault());
-  suggestDismiss.addEventListener('mousedown', e => e.preventDefault());
+  actionBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  dismissBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
 
-  actionBtn.addEventListener('click', () => {
+  actionBtn.addEventListener('click', function () {
     if (!activeField || !pendingDir) return;
-    const fn   = pendingDir === 'toEnglish' ? toEnglish : toHebrew;
-    const lang = pendingDir === 'toEnglish' ? 'en' : 'he';
-    applyConvert(activeField, fn);
-    savePref(lang);
+    var dir = pendingDir;
+    applyToField(activeField, function (t) { return D.convertSpan(t, dir); });
+    convertedTo.set(activeField, getText(activeField));
     hideChip();
   });
 
-  suggestDismiss.addEventListener('click', hideChip);
+  dismissBtn.addEventListener('click', function () {
+    if (activeField) dismissedFor.set(activeField, getText(activeField));
+    hideChip();
+  });
 
-  // ── Detection loop ────────────────────────────────────────────────────────
+  // ── Detection loop ───────────────────────────────────────────────────────
   function runDetection(el) {
-    if (!el || !isEditable(el)) return;
-    const target = getSelection(el) || getText(el);
-    const dir    = detectConversion(target);
-    if (dir) showChip(el, dir);
-    else hideChip();
+    if (!siteEnabled || !el || !isEditable(el) || isPassword(el)) return;
+    var text = getSelectionText(el) || getText(el);
+    if (!text) { hideChip(); return; }
+    if (dismissedFor.get(el) === text || convertedTo.get(el) === text) { hideChip(); return; }
+
+    var dir = D.detectConversion(text);
+    if (dir) showChip(el, dir); else hideChip();
   }
 
-  function scheduleDetection(el) {
-    clearTimeout(detectionTimer);
-    detectionTimer = setTimeout(() => runDetection(el), 700);
+  function schedule(el) {
+    clearTimeout(timer);
+    timer = setTimeout(function () { runDetection(el); }, DEBOUNCE_MS);
   }
 
-  // ── Field & input tracking ────────────────────────────────────────────────
-  document.addEventListener('focusin', e => {
-    if (isEditable(e.target) && !e.target.hasAttribute('data-lang-fixer-host')) {
-      activeField = e.target;
+  document.addEventListener('focusin', function (e) {
+    if (isEditable(e.target) && !e.target.hasAttribute('data-lang-fixer-host')) activeField = e.target;
+  }, true);
+
+  document.addEventListener('focusout', function (e) {
+    if (e.target !== activeField) return;
+    clearTimeout(timer);
+    setTimeout(function () {
+      if (document.activeElement !== activeField) { hideChip(); activeField = null; }
+    }, 220);
+  }, true);
+
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (!isEditable(el) || el.hasAttribute('data-lang-fixer-host')) return;
+    activeField = el;
+    if (isPassword(el)) return;      // never auto-scan a password
+    hideChip();                      // stale suggestion shouldn't linger while typing
+    schedule(el);
+  }, true);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && pendingDir) {
+      if (activeField) dismissedFor.set(activeField, getText(activeField));
+      hideChip();
     }
   }, true);
 
-  document.addEventListener('focusout', e => {
-    if (e.target === activeField) {
-      clearTimeout(detectionTimer);
-      setTimeout(() => {
-        if (document.activeElement !== activeField) {
-          hideChip();
-          activeField = null;
-        }
-      }, 220);
-    }
-  }, true);
-
-  document.addEventListener('input', e => {
-    if (!isEditable(e.target) || e.target.hasAttribute('data-lang-fixer-host')) return;
-    activeField = e.target;
-    scheduleDetection(e.target);
-  }, true);
-
-  document.addEventListener('scroll', () => {
-    if (activeField && chip.classList.contains('visible')) placeChip(activeField);
+  document.addEventListener('scroll', function () {
+    if (activeField && pendingDir) placeChip(activeField);
   }, { passive: true, capture: true });
 
-  // ── Keyboard listeners ────────────────────────────────────────────────────
-  document.addEventListener('keydown', e => {
-    if (e.altKey && e.shiftKey && e.key === 'F' && activeField) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (pendingDir) {
-        actionBtn.click();
-      } else {
-        const dir = detectConversion(getSelection(activeField) || getText(activeField));
-        if (dir) { showChip(activeField, dir); }
-      }
-    }
-  }, true);
+  window.addEventListener('resize', function () {
+    if (activeField && pendingDir) placeChip(activeField);
+  }, { passive: true });
 
-  (document.body ?? document.documentElement).appendChild(host);
+  (document.body || document.documentElement).appendChild(host);
 })();

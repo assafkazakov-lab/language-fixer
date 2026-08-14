@@ -125,13 +125,13 @@ re-discover the answer there.
 
 ## Milestone 1 — Native shell, reactive fixing, layout switching
 
-**Port the detection core to Swift.** `detect.js` is claimed to measure 0.1–0.3%
-false positives at ~97% recall on held-out corpus text, but no script in this
-repo currently reproduces that number — `test/detect.test.js` is a fixed set of
-hand-picked assertions, not a corpus-scale eval. Treat the figure as unverified
-until an eval harness is built against the corpora in `tools/`; low priority
-unless it's used externally (marketing copy, a paid-demand landing page), but
-worth fixing before then. Port `scoreWord`,
+**Port the detection core to Swift.** `detect.js` measures (via
+`tools/eval_model.js`, on 3,000 held-out words per language, scored in
+isolation) 0.3–0.7% false positives at 89–91% recall — lower than an earlier
+unreproducible claim of ~97%, mostly explained by the 4-character evidence
+floor excluding short words by design; recall rises to 93–95% restricted to
+words ≥4 chars, and real multi-word messages aggregate evidence past that
+floor anyway. Port `scoreWord`,
 `tokenEvidence`, `convertSpan` and `flip` (~150 lines) unchanged in structure —
 Hebrew-only means the existing two-way comparison is exactly right.
 

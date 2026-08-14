@@ -24,14 +24,18 @@ Repo `kazakov100/language-fixer`, branch
 | `content.js`, `background.js`, `popup.*` | Extension UI, hotkey relay, per-site toggle. |
 | `tools/build_model.js` | Regenerates the model reproducibly from public corpora. |
 
-`npm test` → 92 + 29 assertions, all green.
+`npm test` → 94 + 29 assertions, all green.
 
-**Detection accuracy** (claimed, on 6,000 held-out corpus words): Hebrew 0.3%
-false positives / 96.3% recall; English 0.1% / 97.9%. Residual failures are true
-ambiguities — `נשמע` genuinely reads as "bang", `baht` as `נשיא`. **This number is
-not currently reproducible from anything in the repo** — no eval script computes
-it, only `test/detect.test.js`'s 92 hand-picked assertions exist. Treat it as
-unverified until an eval harness is built against the corpora in `tools/`.
+**Detection accuracy** — measured via `tools/eval_model.js` (new: this didn't
+exist before, the earlier number wasn't reproducible from anything in the repo),
+on 3,000 held-out words per language, scored in isolation: Hebrew 0.67% false
+positives / 88.8% recall (92.9% for words ≥4 chars); English 0.33% / 91.0%
+(95.3% for words ≥4 chars). Lower than the number originally quoted here, most
+of the gap explained by `detectConversion`'s 4-character evidence floor
+excluding short words by design — real messages are multi-word, so this eval
+is intentionally the harder isolated-word case. Residual failures are true
+ambiguities — `נשמע` genuinely reads as "bang", `baht` as `נשיא` — plus some
+corpus noise.
 
 An earlier heuristic fired on *correctly typed* text in both languages (`github`,
 `docker compose up`, `מה שלומך` all triggered it). That was replaced, along with

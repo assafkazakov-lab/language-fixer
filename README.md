@@ -38,21 +38,26 @@ must keep quiet.
 
 ## Detection accuracy
 
-Claimed, on 6,000 corpus words held out across frequency bands:
+Measured with `node tools/eval_model.js`, on 3,000 words per language held out
+from the shipped dictionary (i.e. outside the top 8,000 by frequency), each
+scored in isolation with no sentence context:
 
-| | false positives | recall |
-|---|---|---|
-| Hebrew | 0.3% | 96.3% |
-| English | 0.1% | 97.9% |
+| | false positives | recall | recall (words ≥4 chars) |
+|---|---|---|---|
+| Hebrew | 0.67% | 88.8% | 92.9% |
+| English | 0.33% | 91.0% | 95.3% |
 
-**Not currently reproducible from this repo** — no eval script computes it;
-`test/detect.test.js` is a fixed set of 92 hand-picked assertions, not a
-corpus-scale evaluation. Treat as unverified until a real eval harness is built
-against the corpora in `tools/`.
+Recall on short words is structurally lower by design: `detectConversion`
+requires at least 4 mapped characters of evidence before it acts at all, to
+keep short tokens from false-positiving. Real messages are mostly multi-word,
+so evidence usually aggregates well past that floor — this eval intentionally
+tests the harder, single-isolated-word case, which is worse than typical
+in-the-field accuracy.
 
-Residual failures are true ambiguities where both readings are real words — `נשמע`
-genuinely reads as "bang", `baht` genuinely reads as `נשיא`. Context-free scoring
-cannot resolve those.
+Residual false positives are true ambiguities where both readings are real
+words — `נשמע` genuinely reads as "bang", `baht` genuinely reads as `נשיא` —
+plus some corpus noise (rare proper nouns, foreign loanwords, transcription
+errors in the frequency list).
 
 ## Rebuilding the model
 

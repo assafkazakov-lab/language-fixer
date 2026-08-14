@@ -4,6 +4,6 @@
   "private": true,
   "description": "Chrome extension that fixes text typed with the wrong keyboard layout (Hebrew <-> English).",
   "scripts": {
-    "test": "node test/detect.test.js"
+    "test": "node test/detect.test.js && node test/predictor.test.js"
   }
 }

@@ -194,7 +194,15 @@
       var tok = m[0];
       if (isCodeLike(tok)) continue;
       var r = tokenEvidence(tok);
-      if (!r || r.dir !== dir) continue;
+      // r.dir is which conversion a token of this script *would* need if it
+      // were wrong — it says nothing about whether this particular token
+      // actually is wrong. A correctly-typed word sharing a script with the
+      // garbled majority of the field (e.g. one real Hebrew word inside an
+      // otherwise-garbled English sentence) still gets r.dir === dir; only
+      // r.ev (this token's own evidence) distinguishes it. Without gating on
+      // sign, a whole-field convert destroys same-script words it should
+      // leave untouched.
+      if (!r || r.dir !== dir || r.ev <= 0) continue;
       var conv = fn(tok);
       for (var i = 0; i < tok.length; i++) out[m.index + i] = conv[i];
     }

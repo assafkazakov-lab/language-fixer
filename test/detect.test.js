@@ -103,6 +103,19 @@ function check(name, cond, detail) {
   const out2 = D.convertSpan(withCode, 'toEnglish');
   check('leaves correct English untouched', out2 === 'run npm install then hello',
     `got ${JSON.stringify(out2)}`);
+
+  // A correctly-typed word sharing a script with the garbled majority of the
+  // field must survive. r.dir is script-determined (any Hebrew-scripted token
+  // is a 'toEnglish' candidate), so without gating on the token's own evidence
+  // sign, converting the whole field for one garbled sentence would also
+  // mangle an unrelated, correctly-typed Hebrew word sitting right next to it.
+  const codeSwitch = D.toHebrew('hello world how are you doing today') + ' שלום';
+  const out3 = D.convertSpan(codeSwitch, 'toEnglish');
+  check('leaves a correct same-script word untouched', out3.endsWith(' שלום'),
+    `got ${JSON.stringify(out3)}`);
+  check('still fixes the actually-garbled part',
+    out3 === 'hello world how are you doing today שלום',
+    `got ${JSON.stringify(out3)}`);
 }
 
 // ── 6. The hotkey flip is unconditional and reversible ───────────────────────

@@ -38,12 +38,17 @@ must keep quiet.
 
 ## Detection accuracy
 
-Measured on 6,000 corpus words held out across frequency bands:
+Claimed, on 6,000 corpus words held out across frequency bands:
 
 | | false positives | recall |
 |---|---|---|
 | Hebrew | 0.3% | 96.3% |
 | English | 0.1% | 97.9% |
+
+**Not currently reproducible from this repo** — no eval script computes it;
+`test/detect.test.js` is a fixed set of 92 hand-picked assertions, not a
+corpus-scale evaluation. Treat as unverified until a real eval harness is built
+against the corpora in `tools/`.
 
 Residual failures are true ambiguities where both readings are real words — `נשמע`
 genuinely reads as "bang", `baht` genuinely reads as `נשיא`. Context-free scoring

@@ -26,8 +26,8 @@ Treating this as one market is the main analytical mistake. It is three:
 | [Input Source Pro](https://github.com/runjuu/InputSourcePro) | macOS | n/a (switches, doesn't detect) | Free, OSS | Fetched repo: 3.4k stars, per-app + per-website rules, **no learning, no content detection** |
 | [Keyswitcher](https://github.com/graninilya/keyswitcher) | macOS | Russian/Latin only | Free, OSS | Fetched repo: 9 stars, real `.dmg`, switches input source, learns word exceptions after 3 reverts |
 | [KeyboardSwitcher](https://github.com/kertser/KeyboardSwitcher) | **Windows only** | En/He/Ru | Free, OSS | Fetched repo: 4 stars, LSTM detection, per-window layout memory, adaptive confidence |
-| [TypeFix](https://typefix.app/) | macOS (Windows in dev) | 29 languages, 92 layouts | **$14.99 one-time**, 7-day trial | Search snippets only — site blocked by proxy |
-| [Rekey](https://trishchuk.com/rekey/alternatives/punto-switcher/) | macOS | Claims 34 languages | Unknown | **Pre-launch waitlist.** Claims are marketing copy for an unreleased product |
+| [TypeFix](https://typefix.app/) | macOS (Windows in dev) | 29 languages, 92 layouts | **$14.99 one-time**, 7-day trial | Fetched site directly (2026-08-14): confirms $14.99 lifetime license, 29 languages/92 layouts, 7-day trial with no card required |
+| [Rekey](https://trishchuk.com/rekey/alternatives/punto-switcher/) | macOS | Claims 34 languages — **Latin, Cyrillic, Greek, Georgian, Armenian, Thai scripts only; no Hebrew or Arabic**, so it doesn't compete in this project's niche even if it ships | Positions itself as **free** ("Free, native, lightweight" vs. paid competitors) | **Still pre-launch waitlist** as of 2026-08-14 — fetched site directly, confirmed unchanged. Claims are marketing copy for an unreleased product |
 | [Keyboard Language Fixer](https://apps.apple.com/us/app/keyboard-language-fixer/id6760297342) | macOS | En/De/El/He/Ko/Ru/Uk | Unknown | App Store listing, blocked by proxy |
 | [kAIboard](https://kaiboard.eu/) | **Mobile** | Multi | Unknown | Search snippets. Learns per contact via phone prefix — closest to our idea, wrong platform |
 | Punto Switcher (Yandex) | Windows | Russian | Free | Well established; no maintained macOS build |
@@ -88,8 +88,13 @@ has to be carried by prediction, not by fixing.
 
 ## Not verified — worth checking on a real machine
 
-- TypeFix and TypeSwitcher: are they shipping products? What do they actually do?
+- ~~TypeFix: is it a shipping product?~~ **Verified 2026-08-14** — yes, live site,
+  pricing/languages/trial as stated above.
+- ~~Rekey's status and price~~ **Verified 2026-08-14** — still pre-launch, now
+  positions itself as free; script coverage excludes Hebrew/Arabic.
+- TypeSwitcher: still unconfirmed as a distinct shipping product.
 - Chrome Web Store install counts for the Hebrew extensions (demand signal)
 - Whether RuSwitcher's experimental Hebrew is actually usable — this is the single
-  most decision-relevant unknown, and an hour of your own typing answers it
-- Rekey's eventual launch and price
+  most decision-relevant unknown left, and only an hour of your own typing
+  answers it. Confirmed the repo is real (159★, real releases, Homebrew cask)
+  but usability of the Hebrew mode itself still needs hands-on testing.

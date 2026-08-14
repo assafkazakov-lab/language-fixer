@@ -70,8 +70,9 @@ makes the differentiator shippable.
 
 ## Milestone 0 — RTL rewrite spike (the gate)
 
-**Do this before anything else.** It is one to two days and it decides whether the
-rest is viable. RuSwitcher labels its Hebrew support experimental, and this is why.
+**Do this before anything else.** Budget closer to a week than a couple of days —
+see exit criteria below — and it decides whether the rest is viable. RuSwitcher
+labels its Hebrew support experimental, and this is why.
 
 What is *not* a problem: Unicode stores text in **logical order** and renders
 right-to-left only at display time via the bidi algorithm. Detection and the 1:1
@@ -106,12 +107,31 @@ builds its own compatibility table from real use instead of shipping a hardcoded
 list.
 
 **Spike exit criteria:** mixed Hebrew/English fixtures rewritten correctly, with
-correct final caret position, in Notes, Slack, Chrome, Terminal and VS Code.
+correct final caret position, in Notes, Chrome, Terminal, VS Code, Slack, WhatsApp
+Desktop, Claude desktop and ChatGPT desktop. The last four are Electron/Chromium
+apps and the ones the risk section below calls highest-value and least certain —
+an earlier draft of this criteria list omitted them and sized the "one to two
+days" estimate against the narrower list, which would have let the gate pass
+without ever testing the case that matters most. They belong in the gate itself,
+not a follow-up, since the rewrite strategy probe (below) needs to run against
+them anyway.
+
+**While instrumenting these apps, also check `kAXTitleAttribute` and
+focused-element ancestry for conversation identity** (see Milestone 2). This is
+the cheapest point to answer open question 2 — whether Electron apps expose
+usable conversation-level context at all — since the same apps are already open
+under AX inspection for the rewrite test. Don't defer it to Milestone 2 and
+re-discover the answer there.
 
 ## Milestone 1 — Native shell, reactive fixing, layout switching
 
-**Port the detection core to Swift.** `detect.js` measures 0.1–0.3% false
-positives at ~97% recall on held-out corpus text. Port `scoreWord`,
+**Port the detection core to Swift.** `detect.js` is claimed to measure 0.1–0.3%
+false positives at ~97% recall on held-out corpus text, but no script in this
+repo currently reproduces that number — `test/detect.test.js` is a fixed set of
+hand-picked assertions, not a corpus-scale eval. Treat the figure as unverified
+until an eval harness is built against the corpora in `tools/`; low priority
+unless it's used externally (marketing copy, a paid-demand landing page), but
+worth fixing before then. Port `scoreWord`,
 `tokenEvidence`, `convertSpan` and `flip` (~150 lines) unchanged in structure —
 Hebrew-only means the existing two-way comparison is exactly right.
 
@@ -249,8 +269,9 @@ Existing, reused:
 ## Verification
 
 1. **RTL rewrite (Milestone 0 gate).** Mixed Hebrew/English fixtures rewritten in
-   Notes, Slack, Chrome, Terminal, VS Code — verify text *and* final caret
-   position in each, via AX read-back.
+   Notes, Chrome, Terminal, VS Code, Slack, WhatsApp Desktop, Claude desktop and
+   ChatGPT desktop — verify text *and* final caret position in each, via AX
+   read-back.
 2. **Model parity.** Same fixtures through `detect.js` and the Swift port;
    identical verdicts required. `test/detect.test.js` is the reference.
 3. **Layout switching.** `TISSelectInputSource` lands on the right source with
@@ -270,7 +291,8 @@ Existing, reused:
   before building the predictor on top of it. Electron apps (Claude, ChatGPT,
   Slack, WhatsApp Desktop) are the uncertain case, and they are also the highest
   value — both the rewrite path and the context read depend on Chromium's AX tree
-  being usefully populated. Probe these five apps in Milestone 0, not later.
+  being usefully populated. Probed in Milestone 0, not deferred to here — see the
+  spike's exit criteria and the AX-context note under Milestone 0.
 - **The differentiator is a feature Input Source Pro could ship** — open source,
   3.4k stars, already owns per-app/per-website switching. Hebrew RTL quality is
   more defensible than the prediction feature alone.

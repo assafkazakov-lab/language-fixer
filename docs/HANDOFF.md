@@ -26,9 +26,12 @@ Repo `kazakov100/language-fixer`, branch
 
 `npm test` → 92 + 29 assertions, all green.
 
-**Detection accuracy** (6,000 held-out corpus words): Hebrew 0.3% false positives
-/ 96.3% recall; English 0.1% / 97.9%. Residual failures are true ambiguities —
-`נשמע` genuinely reads as "bang", `baht` as `נשיא`.
+**Detection accuracy** (claimed, on 6,000 held-out corpus words): Hebrew 0.3%
+false positives / 96.3% recall; English 0.1% / 97.9%. Residual failures are true
+ambiguities — `נשמע` genuinely reads as "bang", `baht` as `נשיא`. **This number is
+not currently reproducible from anything in the repo** — no eval script computes
+it, only `test/detect.test.js`'s 92 hand-picked assertions exist. Treat it as
+unverified until an eval harness is built against the corpora in `tools/`.
 
 An earlier heuristic fired on *correctly typed* text in both languages (`github`,
 `docker compose up`, `מה שלומך` all triggered it). That was replaced, along with
@@ -126,8 +129,9 @@ where there are many threads in different languages.
 
 Full detail in [PLAN.md](PLAN.md).
 
-**Milestone 0 — RTL rewrite spike. THE GATE. Needs a Mac; not done.** One to two
-days, decides viability. RuSwitcher labels its Hebrew experimental for this reason.
+**Milestone 0 — RTL rewrite spike. THE GATE. Needs a Mac; not done.** Budget
+closer to a week than a couple of days — see exit criteria below — and it
+decides viability. RuSwitcher labels its Hebrew experimental for this reason.
 
 Detection and conversion are unaffected by RTL — Unicode is stored in logical
 order. The problem is confined to writing text back, and three rules solve it:
@@ -143,9 +147,17 @@ and diff against what was expected. Match means that strategy works here — rec
 it. The app builds its own compatibility table instead of shipping a hardcoded list.
 
 Exit criteria: mixed Hebrew/English fixtures rewritten correctly, with correct
-caret position, in Notes, Slack, Chrome, Terminal and VS Code — **and the five
-Electron apps (Claude, ChatGPT, Slack, WhatsApp Desktop, Discord), which are
-simultaneously highest-value and least certain.**
+caret position, in Notes, Chrome, Terminal, VS Code, Slack, WhatsApp Desktop,
+Claude desktop and ChatGPT desktop. The last four are Electron/Chromium apps and
+**simultaneously highest-value and least certain** — they belong in the gate
+itself, sized into the estimate above, not a follow-up check after the gate
+already passed on the easier apps. (Discord dropped from this list: it doesn't
+recur as a target anywhere else in this doc or in PLAN.md.)
+
+While these apps are open under AX inspection for the rewrite test, also check
+`kAXTitleAttribute` and focused-element ancestry for conversation identity —
+this is the cheapest point to answer open question 2 below, and there's no
+reason to defer it to Milestone 2 and re-discover the same answer later.
 
 **Milestone 1** — Port the `detect.js` scoring core to Swift (~150 lines; ports
 as-is now that scope is Hebrew-only). Menu-bar app with `CGEventTap`,
@@ -170,12 +182,24 @@ predictor.
 
 ## Recommended next step
 
-**Ship prediction in the Chrome extension first.** Browser tabs give reliable
-per-conversation identity via the DOM — no Mac, no Accessibility prompt, no
-notarization, no Apple developer fee. That validates the only defensible
-differentiator before spending anything on the native build, which matters given
-open question 3.
+**Go straight at Milestone 0 — the RTL rewrite spike.** An earlier version of
+this recommendation said to ship prediction in the Chrome extension first,
+reasoning that it validates the differentiator cheaply, with no Mac or
+Accessibility prompt needed. That doesn't hold up: the extension only reaches
+Chrome tabs, not Slack, Notes, Terminal, VS Code, or WhatsApp Desktop — the
+places the actual papercut lives — so it would validate a different, easier
+problem, not the native app. It also tests neither of the two things that
+could actually kill this project (RTL rewrite reliability, Electron AX
+access), which this document itself calls the make-or-break gate. Running the
+extension experiment first would spend time without touching either real
+risk.
 
-Also worth an hour: install RuSwitcher and judge whether its experimental Hebrew
-is actually usable. That is the single most decision-relevant unknown, and only
+Milestone 0, re-scoped to include the Electron apps (see exit criteria above),
+answers both open questions in one pass — RTL viability and whether Electron
+apps expose usable conversation context — since the apps are instrumented for
+the rewrite test anyway.
+
+Also worth an hour, in parallel: install RuSwitcher and judge whether its
+experimental Hebrew is actually usable. That is the single most
+decision-relevant unknown answerable without building anything, and only
 first-hand use answers it.
